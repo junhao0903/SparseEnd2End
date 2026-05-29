@@ -1,5 +1,6 @@
 #!/bin/bash
 # Copyright (c) 2024 SparseEnd2End. All rights reserved @author: Thomas Von Wu.
+# 对应 export_OneModel_onnx.py --use_deformable_func=False 导出的 ONNX（grid_sample 支路，无需 DFA 插件）
 
 ################***EnvVersion-1***#################
 ###     LinuxPlatform:            x86_64                                                        ###
@@ -40,35 +41,18 @@ if [ ! -f "${ENV_TensorRT_BIN}/trtexec" ]; then
     return
 fi
 
-if [ ! -f "${ENV_CUDA_BIN}/nvcc" ]; then
-    echo "[ERROR] Failed to Find ${ENV_CUDA_BIN}/nvcc!"
-    return
-fi
-
-if [ -f "deploy/dfa_plugin/tools/cudasm.sh" ]; then
-    . "deploy/dfa_plugin/tools/cudasm.sh"
-else
-    echo "[ERROR] Failed to Find \"deploy/dfa_plugin/tools/cudasm.sh\" File!"
-    return
-fi
-
 # Part1
-export CUDASM=$cudasm
 export PATH=$ENV_TensorRT_BIN:$CUDA_BIN:$PATH
 export LD_LIBRARY_PATH=$ENV_TensorRT_LIB:$ENV_CUDA_LIB:$ENV_cuDNN_LIB:$LD_LIBRARY_PATH
 
-#Part2 Build TensoRT engine.
+# Part2 Build TensorRT engine (grid_sample 支路无需 DFA 插件).
 export ENVTRTDIR=deploy/engine
-export ENVTARGETPLUGIN=deploy/dfa_plugin/lib/deformableAttentionAggr.so
 
-export ENV_BACKBONE_ONNX=deploy/onnx/sparse4dbackbone.onnx
-export ENV_BACKBONE_ENGINE=${ENVTRTDIR}/sparse4dbackbone.engine
+export ENV_SPARSEV41_ONNX=deploy/onnx/sparse4dv3_1st_gridsample.onnx
+export ENV_SPARSEV41_ENGINE=${ENVTRTDIR}/sparse4dv3_1st_gridsample.engine
 
-export ENV_HEAD1_ONNX=deploy/onnx/sparse4dhead1st.onnx
-export ENV_HEAD1_ENGINE=${ENVTRTDIR}/sparse4dhead1st.engine
-
-export ENV_HEAD2_ONNX=deploy/onnx/sparse4dhead2nd.onnx
-export ENV_HEAD2_ENGINE=${ENVTRTDIR}/sparse4dhead2nd.engine
+export ENV_SPARSEV42_ONNX=deploy/onnx/sparse4dv3_2nd_gridsample.onnx
+export ENV_SPARSEV42_ENGINE=${ENVTRTDIR}/sparse4dv3_2nd_gridsample.engine
 
 echo "===================================================================================================================="
 echo "||  Config Environment Below:"
@@ -79,14 +63,12 @@ echo "||  CUDA_LIB \t: $ENV_CUDA_LIB"
 echo "||  CUDA_INC \t: $ENV_CUDA_INC"
 echo "||  CUDA_BIN \t: $ENV_CUDA_BIN"
 echo "||  CUDNN_LIB \t: $ENV_cuDNN_LIB"
-echo "||  CUDASM\t: sm_$cudasm"
-echo "||  ENVTRTDIR\t: $ENVTRTDIR"
-echo "||  ENVTARGETPLUGIN\t: $ENVTARGETPLUGIN"
-echo "||  ENV_BACKBONE_ONNX\t: $ENV_BACKBONE_ONNX"
-echo "||  ENV_BACKBONE_ENGINE\t: $ENV_BACKBONE_ENGINE"
-echo "||  ENV_HEAD1_ONNX\t: $ENV_HEAD1_ONNX"
-echo "||  ENV_HEAD1_ENGINE\t: $ENV_HEAD1_ENGINE"
-echo "||  ENV_HEAD2_ONNX\t: $ENV_HEAD2_ONNX"
-echo "||  ENV_HEAD2_ENGINE\t: $ENV_HEAD2_ENGINE"
+echo "||  ENVTRTDIR\t: ${ENVTRTDIR} (deploy/engine)"
+echo "||  "
+echo "||  NOTE: grid_sample 支路无需 DFA 插件，trtexec 构建时不要传 --plugins"
+echo "||  ENV_SPARSEV41_ONNX\t: $ENV_SPARSEV41_ONNX"
+echo "||  ENV_SPARSEV41_ENGINE\t: $ENV_SPARSEV41_ENGINE"
+echo "||  ENV_SPARSEV42_ONNX\t: $ENV_SPARSEV42_ONNX"
+echo "||  ENV_SPARSEV42_ENGINE\t: $ENV_SPARSEV42_ENGINE"
 echo "===================================================================================================================="
 echo "[INFO] Config Env Done, Please Check EnvPrintOut Above!"

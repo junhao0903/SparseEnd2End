@@ -131,7 +131,7 @@ class SparseBox3DRefinementModule(BaseModule):
         feature = instance_feature + anchor_embed
         output = self.layers(feature)  # (bs ,num_query, 256) => (bs ,num_query, 11)
         if self.refine_yaw:  # default=True
-            output[..., :SIN_YAW] = output[..., :SIN_YAW] + anchor[..., :SIN_YAW]
+            output[..., :VX] = output[..., :VX] + anchor[..., :VX]
         else:
             output[..., :VX] = output[..., :VX] + anchor[..., :VX]
 

@@ -61,14 +61,11 @@ export LD_LIBRARY_PATH=$ENV_TensorRT_LIB:$ENV_CUDA_LIB:$ENV_cuDNN_LIB:$LD_LIBRAR
 export ENVTRTDIR=deploy/engine
 export ENVTARGETPLUGIN=deploy/dfa_plugin/lib/deformableAttentionAggr.so
 
-export ENV_BACKBONE_ONNX=deploy/onnx/sparse4dbackbone.onnx
-export ENV_BACKBONE_ENGINE=${ENVTRTDIR}/sparse4dbackbone.engine
+export ENV_SPARSEV41_ONNX=deploy/onnx/sparse4dv3_1st.onnx
+export ENV_SPARSEV41_ENGINE=${ENVTRTDIR}/sparse4dv3_1st.engine
 
-export ENV_HEAD1_ONNX=deploy/onnx/sparse4dhead1st.onnx
-export ENV_HEAD1_ENGINE=${ENVTRTDIR}/sparse4dhead1st.engine
-
-export ENV_HEAD2_ONNX=deploy/onnx/sparse4dhead2nd.onnx
-export ENV_HEAD2_ENGINE=${ENVTRTDIR}/sparse4dhead2nd.engine
+export ENV_SPARSEV42_ONNX=deploy/onnx/sparse4dv3_2nd.onnx
+export ENV_SPARSEV42_ENGINE=${ENVTRTDIR}/sparse4dv3_2nd.engine
 
 echo "===================================================================================================================="
 echo "||  Config Environment Below:"
@@ -82,11 +79,9 @@ echo "||  CUDNN_LIB \t: $ENV_cuDNN_LIB"
 echo "||  CUDASM\t: sm_$cudasm"
 echo "||  ENVTRTDIR\t: $ENVTRTDIR"
 echo "||  ENVTARGETPLUGIN\t: $ENVTARGETPLUGIN"
-echo "||  ENV_BACKBONE_ONNX\t: $ENV_BACKBONE_ONNX"
-echo "||  ENV_BACKBONE_ENGINE\t: $ENV_BACKBONE_ENGINE"
-echo "||  ENV_HEAD1_ONNX\t: $ENV_HEAD1_ONNX"
-echo "||  ENV_HEAD1_ENGINE\t: $ENV_HEAD1_ENGINE"
-echo "||  ENV_HEAD2_ONNX\t: $ENV_HEAD2_ONNX"
-echo "||  ENV_HEAD2_ENGINE\t: $ENV_HEAD2_ENGINE"
+echo "||  ENV_SPARSEV41_ONNX\t: $ENV_SPARSEV41_ONNX"
+echo "||  ENV_SPARSEV41_ENGINE\t: $ENV_SPARSEV41_ENGINE"
+echo "||  ENV_SPARSEV42_ONNX\t: $ENV_SPARSEV42_ONNX"
+echo "||  ENV_SPARSEV42_ENGINE\t: $ENV_SPARSEV42_ENGINE"
 echo "===================================================================================================================="
 echo "[INFO] Config Env Done, Please Check EnvPrintOut Above!"

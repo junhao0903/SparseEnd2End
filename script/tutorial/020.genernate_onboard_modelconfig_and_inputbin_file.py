@@ -5,11 +5,19 @@ Generate onboard config parameters  file  and model input bin file offline.
     2) lidar2img6x4x4.bin (each frame's lidar2img is different)
 """
 
+import os
+import sys
+from pathlib import Path
+
 import yaml
 import numpy as np
 
 from tqdm import tqdm
 from typing import Optional, Any, Dict
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from tool.utils.config import read_cfg
 from tool.trainer.utils import set_random_seed
@@ -33,6 +41,8 @@ def build_module(cfg, default_args: Optional[Dict] = None) -> Any:
 
 def gen_kmeans_anchor(model_path, model_cfg):
 
+    os.makedirs("onboard/assets", exist_ok=True)
+
     model = build_module(model_cfg)
     load_checkpoint(model, model_path, map_location="cpu")
 
@@ -47,8 +57,10 @@ def gen_lidar2img_calib_params(config, seed=100, num_frames=5):
     """
     Eeach frame's lidar2img calibration parameter  is different, so, we must save each frame's  parameter.
     """
-    dataset_type = config.copy()["data"]["val"].pop("type")
-    dataset = eval(dataset_type)(**cfg["data"]["val"])
+    os.makedirs("onboard/assets", exist_ok=True)
+    dataset_cfg = config.copy()["data"]["val"]
+    dataset_type = dataset_cfg.pop("type")
+    dataset = eval(dataset_type)(**dataset_cfg)
 
     dataloader = dataloader_wrapper(
         dataset,

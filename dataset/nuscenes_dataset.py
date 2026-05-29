@@ -3,6 +3,7 @@ import os
 import math
 import json
 import copy
+import pickle
 import pyquaternion
 import numpy as np
 
@@ -93,13 +94,32 @@ class NuScenes4DDetTrackDataset(Dataset):
             ann_file, (str, list)
         ), f"{ann_file} is not supported for annotations loading."
         if isinstance(ann_file, str):  # data str knowned dir
-            files = os.listdir(ann_file)
-            ann_file = [os.path.join(ann_file, file) for file in files]
+            if os.path.isdir(ann_file):
+                files = os.listdir(ann_file)
+                ann_file = [os.path.join(ann_file, file) for file in files]
+            elif ann_file.endswith(".pkl"):
+                with open(ann_file, "rb") as f:
+                    data = pickle.load(f)
+                if isinstance(data, dict) and "infos" in data:
+                    annotations = data["infos"]
+                elif isinstance(data, list):
+                    annotations = data
+                else:
+                    raise TypeError(
+                        f"Unsupported pkl annotation format in {ann_file}."
+                    )
+                ann_file = []
+            elif ann_file.endswith(".json"):
+                ann_file = [ann_file]
+            else:
+                raise ValueError(f"Unsupported annotation path: {ann_file}")
         for ann in ann_file:
             annotations += json.load(open(ann, "r"))
         ordered_annotations = list(sorted(annotations, key=lambda e: e["timestamp"]))
         ordered_annotations = ordered_annotations[:: self._load_interval]
-        self._scene = list(set([ann["scene_token"] for ann in ordered_annotations]))
+        self._scene = list(
+            set([ann.get("scene_token", ann["token"]) for ann in ordered_annotations])
+        )
         return ordered_annotations
 
     def get_data_info(self, index):
@@ -110,7 +130,7 @@ class NuScenes4DDetTrackDataset(Dataset):
         info = self._ordered_annotations[index]
 
         input_dict = dict(
-            sample_scene=info["scene_token"],
+            sample_scene=info.get("scene_token", info["token"]),
             sample_idx=info["token"],
             pts_filename=info["lidar_path"],
             sweeps=info["sweeps"],

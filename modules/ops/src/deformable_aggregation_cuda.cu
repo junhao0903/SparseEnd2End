@@ -126,6 +126,8 @@ __device__ void bilinear_sampling_grad(
 }
 
 
+// Deterministic version: one thread per output element, no atomicAdd.
+// Each thread loops over all (pt, cam, level) contributions in a fixed order.
 __global__ void deformable_aggregation_kernel(
     const int num_kernels,
     float* output,
@@ -146,44 +148,49 @@ __global__ void deformable_aggregation_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_kernels) return;
 
-    const float weight = *(weights + idx / (num_embeds / num_groups));
+    // idx maps to (batch_index, anchor_index, channel_index)
     const int channel_index = idx % num_embeds;
     idx /= num_embeds;
-    const int scale_index = idx % num_scale;
-    idx /= num_scale;
-
-    const int cam_index = idx % num_cams;
-    idx /= num_cams;
-    const int pts_index = idx % num_pts;
-    idx /= num_pts;
-
-    int anchor_index = idx % num_anchors;
+    const int anchor_index = idx % num_anchors;
     idx /= num_anchors;
-    const int batch_index = idx % batch_size;
-    idx /= batch_size;
+    const int batch_index = idx;
 
-    anchor_index = batch_index * num_anchors + anchor_index;
-    const int loc_offset = ((anchor_index * num_pts + pts_index) * num_cams + cam_index) << 1;
+    float accum = 0.0f;
 
-    const float loc_w = sample_location[loc_offset];
-    if (loc_w <= 0 || loc_w >= 1) return;
-    const float loc_h = sample_location[loc_offset + 1];
-    if (loc_h <= 0 || loc_h >= 1) return;
-    
-    int cam_scale_index = cam_index * num_scale + scale_index;
-    const int value_offset = (batch_index * num_feat + scale_start_index[cam_scale_index]) * num_embeds + channel_index;
+    // Loop over all contributing (pt, cam, level) tuples in deterministic order
+    for (int pts_index = 0; pts_index < num_pts; ++pts_index) {
+        for (int cam_index = 0; cam_index < num_cams; ++cam_index) {
+            for (int scale_index = 0; scale_index < num_scale; ++scale_index) {
+                const int loc_offset = ((anchor_index * num_pts + pts_index) * num_cams + cam_index) << 1;
 
-    cam_scale_index = cam_scale_index << 1;
-    const int h = spatial_shape[cam_scale_index];
-    const int w = spatial_shape[cam_scale_index + 1];
+                const float loc_w = sample_location[loc_offset];
+                if (loc_w <= 0 || loc_w >= 1) continue;
+                const float loc_h = sample_location[loc_offset + 1];
+                if (loc_h <= 0 || loc_h >= 1) continue;
 
-    const float h_im = loc_h * h - 0.5;
-    const float w_im = loc_w * w - 0.5;
+                int cam_scale_index = cam_index * num_scale + scale_index;
+                const int value_offset = (batch_index * num_feat + scale_start_index[cam_scale_index]) * num_embeds + channel_index;
 
-    atomicAdd(
-        output + anchor_index * num_embeds + channel_index,
-        bilinear_sampling(mc_ms_feat, h, w, num_embeds, h_im, w_im, value_offset) * weight
-    );
+                cam_scale_index = cam_scale_index << 1;
+                const int h = spatial_shape[cam_scale_index];
+                const int w = spatial_shape[cam_scale_index + 1];
+
+                const float h_im = loc_h * h - 0.5;
+                const float w_im = loc_w * w - 0.5;
+
+                if (h_im > -1 && w_im > -1 && h_im < h && w_im < w) {
+                    const int group_index = channel_index / (num_embeds / num_groups);
+                    const int weight_idx =
+                        ((anchor_index * num_pts + pts_index) * num_cams + cam_index) * num_scale * num_groups
+                        + scale_index * num_groups + group_index;
+                    accum += bilinear_sampling(mc_ms_feat, h, w, num_embeds,
+                                                h_im, w_im, value_offset) * weights[weight_idx];
+                }
+            }
+        }
+    }
+
+    output[(batch_index * num_anchors + anchor_index) * num_embeds + channel_index] = accum;
 }
 
 
@@ -278,9 +285,9 @@ void deformable_aggregation(
     int num_pts,
     int num_groups
 ) {
-    const int num_kernels = batch_size * num_pts * num_embeds * num_anchors * num_cams * num_scale;
+    const int num_kernels = batch_size * num_anchors * num_embeds;
     deformable_aggregation_kernel
-        <<<(int)ceil(((double)num_kernels/128)), 128>>>(
+        <<<(int)ceil(((double)num_kernels/256)), 256>>>(
         num_kernels, output,
         mc_ms_feat, spatial_shape, scale_start_index, sample_location, weights,
         batch_size, num_cams, num_feat, num_embeds, num_scale, num_anchors, num_pts, num_groups

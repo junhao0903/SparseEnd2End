@@ -347,7 +347,7 @@ data = dict(
         # ann_file=[
         #     "data/nusc_anno_dumpjson/train/2fc3753772e241f2ab2cd16a784cc680.json"
         # ],
-        ann_file="data/nusc_anno_dumpjson/train",
+        ann_file=anno_root + "nuscenes_infos_train.pkl",
         pipeline=train_pipeline,
         train_mode=True,
         data_aug_conf=data_aug_conf,
@@ -358,7 +358,7 @@ data = dict(
     val=dict(
         **data_basic_config,
         # ann_file=["data/nusc_anno_dumpjson/val/325cef682f064c55a255f2625c533b75.json"],
-        ann_file="data/nusc_anno_dumpjson/val",
+        ann_file=anno_root + "nuscenes_infos_val.pkl",
         pipeline=val_pipeline,
         data_aug_conf=data_aug_conf,
         val_mode=True,
@@ -370,7 +370,7 @@ data = dict(
         data_root=data_root,
         classes=class_names,
         version="v1.0-mini",
-        ann_file="data/nusc_anno_dumpjson/val",
+        ann_file=anno_root + "nuscenes_infos_val.pkl",
         pipeline=test_pipeline,
         data_aug_conf=data_aug_conf,
         test_mode=True,

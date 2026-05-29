@@ -57,8 +57,10 @@ __device__ float thomas_bilinear_sampling(const float*& bottom_data,
     return val;
 }
 
+// Deterministic version: one thread per output element, no atomicAdd.
+// Each thread loops over all (pt, cam, level) contributions in a fixed order.
 __global__ void thomas_deformable_aggregation_kernel(
-    const int32_t num_kernels,         // batch_size * num_pts * num_embeds * num_anchors * num_cams * num_scale;
+    const int32_t num_kernels,         // batch_size * num_anchors * num_embeds
     float* output,                     // batch_size * num_anchors * num_embeds
     const float* mc_ms_feat,           // batch_size * num_feat * num_embeds
     const int32_t* spatial_shape,      // num_cams * num_scale * 2
@@ -78,51 +80,50 @@ __global__ void thomas_deformable_aggregation_kernel(
     if (idx >= num_kernels)
         return;
 
-    const float weight = *(weights + idx / (num_embeds / num_groups));
+    // idx maps to (batch_index, anchor_index, channel_index)
     const int32_t channel_index = idx % num_embeds;
     idx /= num_embeds;
-    const int32_t scale_index = idx % num_scale;
-    idx /= num_scale;
-
-    const int32_t cam_index = idx % num_cams;
-    idx /= num_cams;
-    const int32_t pts_index = idx % num_pts;
-    idx /= num_pts;
-
-    int32_t anchor_index = idx % num_anchors;
+    const int32_t anchor_index = idx % num_anchors;
     idx /= num_anchors;
-    const int32_t batch_index = idx % batch_size;
-    idx /= batch_size;
+    const int32_t batch_index = idx;
 
-    anchor_index = batch_index * num_anchors + anchor_index;
-    const int32_t loc_offset = ((anchor_index * num_pts + pts_index) * num_cams + cam_index) << 1;
+    float accum = 0.0f;
 
-    const float loc_w = sample_location[loc_offset];
-    if (loc_w <= 0 || loc_w >= 1)
-        return;
-    const float loc_h = sample_location[loc_offset + 1];
-    if (loc_h <= 0 || loc_h >= 1)
-        return;
+    // Loop over all contributing (pt, cam, level) tuples in deterministic order
+    for (int32_t pts_index = 0; pts_index < num_pts; ++pts_index) {
+        for (int32_t cam_index = 0; cam_index < num_cams; ++cam_index) {
+            for (int32_t scale_index = 0; scale_index < num_scale; ++scale_index) {
+                const int32_t loc_offset = ((anchor_index * num_pts + pts_index) * num_cams + cam_index) << 1;
 
-    int32_t cam_scale_index = cam_index * num_scale + scale_index;
-    const int32_t value_offset =
-        (batch_index * num_feat + scale_start_index[cam_scale_index]) * num_embeds + channel_index;
+                const float loc_w = sample_location[loc_offset];
+                if (loc_w <= 0 || loc_w >= 1) continue;
+                const float loc_h = sample_location[loc_offset + 1];
+                if (loc_h <= 0 || loc_h >= 1) continue;
 
-    if (value_offset > batch_size * num_feat * num_embeds || value_offset < 0)
-        return;
+                int32_t cam_scale_index = cam_index * num_scale + scale_index;
+                const int32_t value_offset =
+                    (batch_index * num_feat + scale_start_index[cam_scale_index]) * num_embeds + channel_index;
 
-    cam_scale_index = cam_scale_index << 1;
-    const int32_t h = spatial_shape[cam_scale_index];
-    const int32_t w = spatial_shape[cam_scale_index + 1];
+                cam_scale_index = cam_scale_index << 1;
+                const int32_t h = spatial_shape[cam_scale_index];
+                const int32_t w = spatial_shape[cam_scale_index + 1];
 
-    const float h_im = loc_h * h - 0.5;
-    const float w_im = loc_w * w - 0.5;
+                const float h_im = loc_h * h - 0.5;
+                const float w_im = loc_w * w - 0.5;
 
-    if (h_im > -1 && w_im > -1 && h_im < h && w_im < w)
-    {
-        atomicAdd(output + anchor_index * num_embeds + channel_index,
-                  thomas_bilinear_sampling(mc_ms_feat, h, w, num_embeds, h_im, w_im, value_offset) * weight);
+                if (h_im > -1 && w_im > -1 && h_im < h && w_im < w) {
+                    const int32_t group_index = channel_index / (num_embeds / num_groups);
+                    const int32_t weight_idx =
+                        ((anchor_index * num_pts + pts_index) * num_cams + cam_index) * num_scale * num_groups
+                        + scale_index * num_groups + group_index;
+                    accum += thomas_bilinear_sampling(mc_ms_feat, h, w, num_embeds,
+                                                      h_im, w_im, value_offset) * weights[weight_idx];
+                }
+            }
+        }
     }
+
+    output[(batch_index * num_anchors + anchor_index) * num_embeds + channel_index] = accum;
 }
 
 int32_t thomas_deform_attn_cuda_forward(cudaStream_t stream,
@@ -141,10 +142,10 @@ int32_t thomas_deform_attn_cuda_forward(cudaStream_t stream,
                                        int32_t mNumPoint,
                                        int32_t mNumGroups)
 {
-    const int32_t num_kernels = batch * mNumCams * mNumLevels * mNumQuery * mNumPoint * mChannels;
+    const int32_t num_kernels = batch * mNumQuery * mChannels;
     cudaError_t err = cudaSuccess;
 
-    thomas_deformable_aggregation_kernel<<<(int32_t)ceil(((double)num_kernels / 128)), 128, 0, stream>>>(num_kernels,
+    thomas_deformable_aggregation_kernel<<<(int32_t)ceil(((double)num_kernels / 256)), 256, 0, stream>>>(num_kernels,
                                                                                                         output,
                                                                                                         value,
                                                                                                         spatialShapes,

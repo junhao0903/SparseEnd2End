@@ -559,6 +559,8 @@ if __name__ == "__main__":
         print("cuda算子支路")
     else:
         print("grid sample支路")
+        args.save_onnx1 = args.save_onnx1.replace(".onnx", "_gridsample.onnx")
+        args.save_onnx2 = args.save_onnx2.replace(".onnx", "_gridsample.onnx")
 
     model = build_module(cfg["model"])
     checkpoint = args.ckpt

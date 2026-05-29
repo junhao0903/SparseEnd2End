@@ -8,7 +8,7 @@
 ###     CUDA capability :        sm_86                                                         ###
 ################***EnvVersion-1***#################
 
-EnvVersion=1
+EnvVersion=2
 if [ $EnvVersion = 1 ]; then
     export ENV_TensorRT_LIB=/mnt/env/tensorrt/TensorRT-8.5.1.7/lib
     export ENV_TensorRT_INC=/mnt/env/tensorrt/TensorRT-8.5.1.7/include
@@ -18,13 +18,13 @@ if [ $EnvVersion = 1 ]; then
     export ENV_CUDA_BIN=/usr/local/cuda-11.6/bin
     export ENV_cuDNN_LIB=/mnt/env/tensorrt/cudnn-linux-x86_64-8.6.0.163_cuda11-archive/lib
 else
-    export ENV_TensorRT_LIB=/mnt/data/env_cfg/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8/TensorRT-8.6.1.6/lib
-    export ENV_TensorRT_INC=/mnt/data/env_cfg/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8/TensorRT-8.6.1.6/include
-    export ENV_TensorRT_BIN=/mnt/data/env_cfg/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-11.8/TensorRT-8.6.1.6/bin
-    export ENV_CUDA_LIB=/usr/local/cuda-11.6/lib64
-    export ENV_CUDA_INC=/usr/local/cuda-11.6/include
-    export ENV_CUDA_BIN=/usr/local/cuda-11.6/bin
-    export ENV_cuDNN_LIB=/mnt/env/tensorrt/cudnn-linux-x86_64-8.6.0.163_cuda11-archive/lib
+    export ENV_TensorRT_LIB=/usr/local/TensorRT-8.6.1.6/lib
+    export ENV_TensorRT_INC=/usr/local/TensorRT-8.6.1.6/include
+    export ENV_TensorRT_BIN=/usr/local/TensorRT-8.6.1.6/bin
+    export ENV_CUDA_LIB=/usr/local/cuda/lib64
+    export ENV_CUDA_INC=/usr/local/cuda/include
+    export ENV_CUDA_BIN=/usr/local/cuda/bin
+    export ENV_cuDNN_LIB=/home/adt/Software/cudnn-linux-x86_64-8.9.0.131_cuda11-archive/lib
 fi
 
 if [ ! -f "${ENV_TensorRT_BIN}/trtexec" ]; then
